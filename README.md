@@ -5,7 +5,7 @@ CoreData Closures 在原生API基础上进行封装。简化CoreData的使用。
 ```
 // CoreData文件：data.xcdatamodeld  包含模型：Model{idx: Int32, time: Date}
 do {
-    try Model.registerCDClosures("data") //第一步注册 CoreData 文件
+    try registerCDClosures("data") //第一步注册 CoreData 文件
 
     try Model.delete(where:"idx = 3")
     try Model.delete()
