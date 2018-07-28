@@ -152,7 +152,7 @@ fileprivate class CDClosures
         }
         
         if let `where` = `where`, `where`.count > 0 {
-            let predicate = NSPredicate(format:`where`, argumentArray: nil)
+            let predicate = NSPredicate(format: `where`, argumentArray: nil)
             request.predicate = predicate
         }
         
@@ -172,13 +172,13 @@ fileprivate class CDClosures
     }
     
     private func select<T:NSManagedObject>(_:T.Type, `where`:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil) throws -> [T] {
-        let request = fetchRequest(T.self, where:`where`, range:range, groupBy:groupBy, sorts:sorts)
+        let request = fetchRequest(T.self, where: `where`, range: range, groupBy: groupBy, sorts: sorts)
         return try context.fetch(request)
     }
     
     @available(iOS 9.0, *)
     private func batchDelete<T:NSManagedObject>(_:T.Type, `where`:String? = nil) throws -> Int {
-        let request = fetchRequest(T.self, where:`where`)
+        let request = fetchRequest(T.self, where: `where`)
         let batchDelete = NSBatchDeleteRequest(fetchRequest: request as! NSFetchRequest<NSFetchRequestResult>)
         batchDelete.resultType = .resultTypeCount
         guard let store = context.persistentStoreCoordinator
@@ -223,7 +223,7 @@ fileprivate class CDClosures
     
     func select<T:NSManagedObject>(_:T.Type, `where`:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil, cb:([T])->Void)throws {
         if let err = (cdcTrydo(msg: "select error", lock: lock) {
-            let ts = try select(T.self, where: `where`, range: range, groupBy:groupBy, sorts: sorts)
+            let ts = try select(T.self, where: `where`, range: range, groupBy: groupBy, sorts: sorts)
             cb(ts)
         }){ throw err }
     }
@@ -272,16 +272,16 @@ fileprivate class CDClosures
     func delete<T:NSManagedObject>(_:T.Type, `where`:String? = nil) throws {
         if let err = (cdcTrydo(msg: "delete error", lock: lock) {
             if #available(iOS 9.0, *) {
-                let _ = try batchDelete(T.self, where:`where`)
+                let _ = try batchDelete(T.self, where: `where`)
             } else {
-                let _ = try ordinaryDelete(T.self, where:`where`)
+                let _ = try ordinaryDelete(T.self, where: `where`)
             }
             try seveIfNeed(aoutSave)
         }){ throw err }
     }
     
     func frc<T:NSManagedObject>(_:T.Type, delegate:NSFetchedResultsControllerDelegate, sectionNameKeyPath:String? = nil, `where`:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil) -> NSFetchedResultsController<T> {
-        let request = fetchRequest(T.self, where:`where`, range:range, sorts:sorts)
+        let request = fetchRequest(T.self, where: `where`, range: range, sorts: sorts)
         let fetchResultsController = NSFetchedResultsController(fetchRequest: request, managedObjectContext: context, sectionNameKeyPath: sectionNameKeyPath, cacheName:nil)
         fetchResultsController.delegate = delegate
         return fetchResultsController;
@@ -306,7 +306,7 @@ extension CDClosuresProtocol where Self : NSManagedObject
     
     static func select(`where`:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil, cb:([Self])->Void)throws {
         let cdc = try cdClosures()
-        try cdc.select(self, where: `where`, range: range, groupBy:groupBy, sorts: sorts, cb: cb)
+        try cdc.select(self, where: `where`, range: range, groupBy: groupBy, sorts: sorts, cb: cb)
     }
     
     static func update(`where`:String? = nil, cb:(Self)->Void) throws {
