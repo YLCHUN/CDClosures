@@ -10,15 +10,20 @@ import Foundation
 import CoreData
 
 private func cdcTrydo(msg:String? = nil, lock:NSLock? = nil, try:() throws -> Void) -> NSError? {
+    var error:NSError?
+    lock?.lock()
     do {
-        lock?.lock()
         try `try`()
-        lock?.unlock()
-        return nil
-    } catch let err as NSError {
-        guard let msg = msg else {return err}
-        return NSError(domain: "\(msg): \(err.domain)", code: err.code, userInfo: err.userInfo)
     }
+    catch let err as NSError {
+        if let msg = msg {
+            error = NSError(domain: "\(msg): \(err.domain)", code: err.code, userInfo: err.userInfo)
+        }else {
+            error = err
+        }
+    }
+    lock?.unlock()
+    return error
 }
 
 fileprivate extension NSError {
@@ -230,7 +235,6 @@ fileprivate class CDClosures
                 cb(t)
             }
             try seveIfNeed(aoutSave)
-            print("update count: \(ts.count)")
         }){ throw err }
     }
     
@@ -240,11 +244,8 @@ fileprivate class CDClosures
             batchUpdate.propertiesToUpdate = update
             batchUpdate.affectedStores = context.persistentStoreCoordinator!.persistentStores
             batchUpdate.resultType = .updatedObjectsCountResultType
-            let result = try context.execute(batchUpdate) as? NSBatchUpdateResult
+            let _ = try context.execute(batchUpdate) as? NSBatchUpdateResult
             try seveIfNeed(aoutSave)
-            if let count = (result?.result as? NSNumber)?.intValue {
-                print("batchUpdate count: \(count)")
-            }
         }){ throw err }
     }
     
@@ -270,14 +271,12 @@ fileprivate class CDClosures
 
     func delete<T:NSManagedObject>(_:T.Type, `where`:String? = nil) throws {
         if let err = (cdcTrydo(msg: "delete error", lock: lock) {
-            let count:Int
             if #available(iOS 9.0, *) {
-                count = try batchDelete(T.self, where:`where`)
+                let _ = try batchDelete(T.self, where:`where`)
             } else {
-                count = try ordinaryDelete(T.self, where:`where`)
+                let _ = try ordinaryDelete(T.self, where:`where`)
             }
             try seveIfNeed(aoutSave)
-            print("delete count: \(count)")
         }){ throw err }
     }
     
