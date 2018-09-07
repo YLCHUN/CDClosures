@@ -18,6 +18,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A9B9D7C7213FD87D007D9E6F /* CDClosures-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "CDClosures-Bridging-Header.h"; sourceTree = "<group>"; };
 		A9E81C8C2102401C0024EC8D /* CDClosures.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CDClosures.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A9E81C8F2102401C0024EC8D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A9E81C912102401C0024EC8D /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
@@ -69,6 +70,7 @@
 				A9E81C962102401D0024EC8D /* Assets.xcassets */,
 				A9E81C982102401D0024EC8D /* LaunchScreen.storyboard */,
 				A9E81C9B2102401D0024EC8D /* Info.plist */,
+				A9B9D7C7213FD87D007D9E6F /* CDClosures-Bridging-Header.h */,
 			);
 			path = CDClosures;
 			sourceTree = "<group>";
@@ -105,6 +107,7 @@
 				TargetAttributes = {
 					A9E81C8B2102401C0024EC8D = {
 						CreatedOnToolsVersion = 9.4;
+						LastSwiftMigration = 1000;
 					};
 				};
 			};
@@ -292,7 +295,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = Z6457HUZQ5;
 				INFOPLIST_FILE = CDClosures/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -300,6 +305,8 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.ylchun.CDClosures;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "CDClosures/CDClosures-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 4.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -309,7 +316,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = Z6457HUZQ5;
 				INFOPLIST_FILE = CDClosures/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -317,6 +326,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.ylchun.CDClosures;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "CDClosures/CDClosures-Bridging-Header.h";
 				SWIFT_VERSION = 4.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
