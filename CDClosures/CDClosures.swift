@@ -10,16 +10,16 @@
 import Foundation
 import CoreData
 
-protocol CDCTrydoEx {
-    func begin()
-    func end()
+protocol CDCCatchEx {
+    func catchBegin()
+    func catchEnd()
 }
 
 @discardableResult
-private func cdcTrydo(msg:String? = nil, lock:NSLock? = nil, ex:CDCTrydoEx? = nil, try:() throws -> Void) -> NSError? {
+private func cdcDoCatch(msg:String? = nil, lock:NSLock? = nil, ex:CDCCatchEx? = nil, try:() throws -> Void) -> NSError? {
     var error:NSError?
     lock?.lock()
-    ex?.begin()
+    ex?.catchBegin()
     do { try `try`() }
     catch let err as NSError {
         if let msg = msg {
@@ -28,13 +28,13 @@ private func cdcTrydo(msg:String? = nil, lock:NSLock? = nil, ex:CDCTrydoEx? = ni
             error = err
         }
     }
-    ex?.end()
+    ex?.catchEnd()
     lock?.unlock()
     return error
 }
 
-private func cdcThrowTrydo(msg:String? = nil, lock:NSLock? = nil, ex:CDCTrydoEx? = nil, try:() throws -> Void) throws {
-    if let err = cdcTrydo(msg: msg, lock: lock, ex: ex, try: `try`) { throw err }
+private func cdcTryCatch(msg:String? = nil, lock:NSLock? = nil, ex:CDCCatchEx? = nil, try:() throws -> Void) throws {
+    if let err = cdcDoCatch(msg: msg, lock: lock, ex: ex, try: `try`) { throw err }
 }
 
 fileprivate extension NSError {
@@ -50,8 +50,8 @@ fileprivate extension NSPersistentStoreCoordinator {
         guard let model = NSManagedObjectModel(contentsOf: url)
             else { throw NSError("can't init NSManagedObjectModel whith momd: \"\(name)\"", 402) }
         
-        guard let sqlpath = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true).first
-            else { throw NSError("can't save sqlite to support directory", 403) }
+        guard let sqlpath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first
+            else { throw NSError("can't save sqlite to document directory", 403) }
         var sqliteURL = URL(fileURLWithPath: sqlpath)
         sqliteURL.appendPathComponent("\(name).sqlite")
         
@@ -118,7 +118,7 @@ class CDCMap<Key, Value> where Key : Hashable {
     }
 }
 
-private class CDCSaver: NSObject, CDCTrydoEx {
+private class CDCSaver: NSObject, CDCCatchEx {
     private var cb:((Bool)->Void)!
     private var time:TimeInterval = 0
     
@@ -164,8 +164,8 @@ private class CDCSaver: NSObject, CDCTrydoEx {
         }
     }
     
-    func begin() { cancelPreviousPerform() }
-    func end() { performDelay() }
+    func catchBegin() { cancelPreviousPerform() }
+    func catchEnd() { performDelay() }
 }
 
 
@@ -189,7 +189,7 @@ fileprivate class CDClosures
         var help:CDClosures? = map[name]
         if let _ = help {
         } else {
-           err = cdcTrydo {
+           err = cdcDoCatch {
                 let context = try NSManagedObjectContext.init(name:name)
                 help = CDClosures(name, context)
                 map[name] = help
@@ -207,7 +207,7 @@ fileprivate class CDClosures
     private lazy var saver = CDCSaver() {[weak self] (delay) in
         guard let `self` = self else { return }
         let lock = delay ? `self`.lock : nil
-        if let err = (cdcTrydo(msg: "save error", lock: lock) {
+        if let err = (cdcDoCatch(msg: "save error", lock: lock) {
             try `self`.context.save()
         }) { debugPrint(err) }
     }
@@ -228,7 +228,7 @@ fileprivate class CDClosures
     }
     
     @objc private func applicationDidEnterBackground() {
-        cdcTrydo(lock: lock) {
+        cdcDoCatch(lock: lock) {
             self.saver.perform(delay: false)
         }
     }
@@ -270,7 +270,7 @@ fileprivate class CDClosures
     
     
     fileprivate func select<T:NSManagedObject>(_:T.Type, `where`:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil, cb:([T])->Void)throws {
-        try cdcThrowTrydo(msg: "select error", lock: lock) {
+        try cdcTryCatch(msg: "select error", lock: lock) {
             let context = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
             context.parent = self.context
             let request = fetchRequest(T.self, where: `where`, range: range, groupBy: groupBy, sorts: sorts)
@@ -281,7 +281,7 @@ fileprivate class CDClosures
     
     fileprivate func update<T:NSManagedObject>(_:T.Type, `where`:String? = nil, cb:(T)->Void) throws -> Int {
         var count = 0
-        try cdcThrowTrydo(msg: "update error", lock: lock, ex: saver) {
+        try cdcTryCatch(msg: "update error", lock: lock, ex: saver) {
             let ts = try select(T.self, where: `where`)
             for t in ts {
                 cb(t)
@@ -292,7 +292,7 @@ fileprivate class CDClosures
     }
     
     fileprivate func insert<T:NSManagedObject>(_:T.Type, count:Int, cb:(Int, T)->Void) throws {
-        try cdcThrowTrydo(msg: "insert error", lock: lock, ex: saver) {
+        try cdcTryCatch(msg: "insert error", lock: lock, ex: saver) {
             let emptyName = entityName(T.self)
             guard let endesc = NSEntityDescription.entity(forEntityName: emptyName, in: context)
                 else { throw NSError("unfind entity: \"\(emptyName)\".", 99) }
@@ -312,7 +312,7 @@ fileprivate class CDClosures
 
     fileprivate func delete<T:NSManagedObject>(_:T.Type, `where`:String? = nil) throws -> Int {
         var count = 0
-        try cdcThrowTrydo(msg: "delete error", lock: lock, ex: saver) {
+        try cdcTryCatch(msg: "delete error", lock: lock, ex: saver) {
             let ts = try select(T.self, where: `where`)
             for t in ts {
                 context.delete(t)
@@ -337,7 +337,7 @@ fileprivate class CDClosures
     @available(iOS 9.0, *)
     fileprivate func batchDelete<T:NSManagedObject>(_:T.Type, `where`:String? = nil) throws -> Int {
         var count = 0
-        try cdcThrowTrydo(msg: "batchUpdate error", lock: lock) {
+        try cdcTryCatch(msg: "batchUpdate error", lock: lock) {
             saver.perform(delay: false)
             let request = fetchRequest(T.self, where: `where`)
             let batchDelete = NSBatchDeleteRequest(fetchRequest: request as! NSFetchRequest<NSFetchRequestResult>)
@@ -351,7 +351,7 @@ fileprivate class CDClosures
     
     fileprivate func batchUpdate<T:NSManagedObject>(_:T.Type, `where`:String? = nil, cb:(CDCMap<String, Any>)->Void) throws -> Int {
         var count = 0
-        try cdcThrowTrydo(msg: "batchDelete error", lock: lock) {
+        try cdcTryCatch(msg: "batchDelete error", lock: lock) {
             saver.perform(delay: false)
             let batchUpdate = NSBatchUpdateRequest(entityName: entityName(T.self))
             if let `where` = `where` {
