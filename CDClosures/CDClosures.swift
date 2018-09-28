@@ -183,21 +183,20 @@ fileprivate class CDClosures
     private static var map:[String:CDClosures] = [:]//fileName:CDClosures
     
     @discardableResult
-    fileprivate static func `init`(name:String) throws -> CDClosures {
+    fileprivate class func `default`(name:String) throws -> CDClosures {
         initlock.lock()
         var err:NSError?
-        var help:CDClosures? = map[name]
-        if let _ = help {
-        } else {
+        var cdc:CDClosures? = map[name]
+        if cdc == nil {
            err = cdcDoCatch {
                 let context = try NSManagedObjectContext.init(name:name)
-                help = CDClosures(name, context)
-                map[name] = help
+                cdc = CDClosures(name, context)
+                map[name] = cdc
             }
         }
         initlock.unlock()
         if let err = err { throw err }
-        return help!
+        return cdc!
     }
     
     private var name:String
@@ -239,7 +238,7 @@ fileprivate class CDClosures
         return name
     }
 
-    private func fetchRequest<T:NSManagedObject>(_ :T.Type, `where`:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil) -> NSFetchRequest<T> {
+    private func fetchRequest<T:NSManagedObject>(_ :T.Type, where:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil) -> NSFetchRequest<T> {
         var request:NSFetchRequest<T>
         if #available(iOS 10.0, *) {
             request = T.fetchRequest() as! NSFetchRequest<T>
@@ -263,13 +262,13 @@ fileprivate class CDClosures
         return request
     }
     
-    private func select<T:NSManagedObject>(_:T.Type, `where`:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil) throws -> [T] {
+    private func select<T:NSManagedObject>(_:T.Type, where:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil) throws -> [T] {
         let request = fetchRequest(T.self, where: `where`, range: range, groupBy: groupBy, sorts: sorts)
         return try context.fetch(request)
     }
     
     
-    fileprivate func select<T:NSManagedObject>(_:T.Type, `where`:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil, cb:([T])->Void)throws {
+    fileprivate func select<T:NSManagedObject>(_:T.Type, where:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil, cb:([T])->Void)throws {
         try cdcTryCatch(msg: "select error", lock: lock) {
             let context = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
             context.parent = self.context
@@ -279,7 +278,7 @@ fileprivate class CDClosures
         }
     }
     
-    fileprivate func update<T:NSManagedObject>(_:T.Type, `where`:String? = nil, cb:(T)->Void) throws -> Int {
+    fileprivate func update<T:NSManagedObject>(_:T.Type, where:String? = nil, cb:(T)->Void) throws -> Int {
         var count = 0
         try cdcTryCatch(msg: "update error", lock: lock, ex: saver) {
             let ts = try select(T.self, where: `where`)
@@ -310,7 +309,7 @@ fileprivate class CDClosures
         }
     }
 
-    fileprivate func delete<T:NSManagedObject>(_:T.Type, `where`:String? = nil) throws -> Int {
+    fileprivate func delete<T:NSManagedObject>(_:T.Type, where:String? = nil) throws -> Int {
         var count = 0
         try cdcTryCatch(msg: "delete error", lock: lock, ex: saver) {
             let ts = try select(T.self, where: `where`)
@@ -324,7 +323,7 @@ fileprivate class CDClosures
     
     
     
-    fileprivate func frc<T:NSManagedObject>(_:T.Type, delegate:NSFetchedResultsControllerDelegate, sectionNameKeyPath:String? = nil, `where`:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil) -> NSFetchedResultsController<T> {
+    fileprivate func frc<T:NSManagedObject>(_:T.Type, delegate:NSFetchedResultsControllerDelegate, sectionNameKeyPath:String? = nil, where:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil) -> NSFetchedResultsController<T> {
         let request = fetchRequest(T.self, where: `where`, range: range, sorts: sorts)
         let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
         context.parent = self.context
@@ -335,7 +334,7 @@ fileprivate class CDClosures
     
     
     @available(iOS 9.0, *)
-    fileprivate func batchDelete<T:NSManagedObject>(_:T.Type, `where`:String? = nil) throws -> Int {
+    fileprivate func batchDelete<T:NSManagedObject>(_:T.Type, where:String? = nil) throws -> Int {
         var count = 0
         try cdcTryCatch(msg: "batchUpdate error", lock: lock) {
             saver.perform(delay: false)
@@ -349,7 +348,7 @@ fileprivate class CDClosures
         return count
     }
     
-    fileprivate func batchUpdate<T:NSManagedObject>(_:T.Type, `where`:String? = nil, cb:(CDCMap<String, Any>)->Void) throws -> Int {
+    fileprivate func batchUpdate<T:NSManagedObject>(_:T.Type, where:String? = nil, cb:(CDCMap<String, Any>)->Void) throws -> Int {
         var count = 0
         try cdcTryCatch(msg: "batchDelete error", lock: lock) {
             saver.perform(delay: false)
@@ -370,7 +369,7 @@ fileprivate class CDClosures
 }
 
 func registerCDClosures(_ name:String) throws {
-    try CDClosures.init(name: name)
+    try CDClosures.default(name: name)
 }
 
 protocol CDClosuresProtocol {}
@@ -381,34 +380,29 @@ extension CDClosuresProtocol where Self : NSManagedObject
         guard let name = CDClosures.modelMap["\(self)"] else {
             throw NSError("unregister CDClosures, please call \"registerCDClosures(fileName)\" at first", 400)
         }
-        return try CDClosures.`init`(name: name)
+        return try CDClosures.default(name: name)
     }
     
-    static func select(`where`:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil, cb:([Self])->Void)throws {
-        let cdc = try cdClosures()
-        try cdc.select(self, where: `where`, range: range, groupBy: groupBy, sorts: sorts, cb: cb)
+    static func select(where:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil, cb:([Self])->Void)throws {
+        try cdClosures().select(self, where: `where`, range: range, groupBy: groupBy, sorts: sorts, cb: cb)
     }
     
     @discardableResult
-    static func update(`where`:String? = nil, cb:(Self)->Void) throws -> Int {
-        let cdc = try cdClosures()
-        return try cdc.update(self, where: `where`, cb: cb)
+    static func update(where:String? = nil, cb:(Self)->Void) throws -> Int {
+        return try cdClosures().update(self, where: `where`, cb: cb)
     }
     
     static func insert(count: Int, cb: (Int, Self) -> Void) throws {
-        let cdc = try cdClosures()
-        try cdc.insert(self, count: count, cb: cb)
+        try cdClosures().insert(self, count: count, cb: cb)
     }
     
     static func insert(cb: (Self) -> Void) throws {
-        let cdc = try cdClosures()
-        try cdc.insert(self, cb: cb)
+        try cdClosures().insert(self, cb: cb)
     }
     
     @discardableResult
-    static func delete(`where`: String? = nil) throws -> Int {
-        let cdc = try cdClosures()
-        return try cdc.delete(self, where: `where`)
+    static func delete(where: String? = nil) throws -> Int {
+        return try cdClosures().delete(self, where: `where`)
     }
 }
 
@@ -417,20 +411,17 @@ extension CDClosuresProtocol where Self : NSManagedObject {
     
     @discardableResult
     @available(iOS 9.0, *)
-    static func batchDelete(`where`: String? = nil) throws -> Int {
-        let cdc = try cdClosures()
-        return try cdc.batchDelete(self, where: `where`)
+    static func batchDelete(where: String? = nil) throws -> Int {
+        return try cdClosures().batchDelete(self, where: `where`)
     }
     
     @discardableResult
-    static func batchUpdate(`where`:String? = nil, cb:(CDCMap<String, Any>)->Void) throws -> Int {
-        let cdc = try cdClosures()
-        return  try cdc.batchUpdate(self, where: `where`, cb: cb)
+    static func batchUpdate(where:String? = nil, cb:(CDCMap<String, Any>)->Void) throws -> Int {
+        return  try cdClosures().batchUpdate(self, where: `where`, cb: cb)
     }
     
-    static func frc(delegate:NSFetchedResultsControllerDelegate, sectionNameKeyPath:String? = nil, `where`:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil) throws -> NSFetchedResultsController<Self> {
-        let cdc = try cdClosures()
-        return cdc.frc(self, delegate: delegate, sectionNameKeyPath: sectionNameKeyPath, where: `where`, range: range, groupBy: groupBy, sorts: sorts)
+    static func frc(delegate:NSFetchedResultsControllerDelegate, sectionNameKeyPath:String? = nil, where:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil) throws -> NSFetchedResultsController<Self> {
+        return try cdClosures().frc(self, delegate: delegate, sectionNameKeyPath: sectionNameKeyPath, where: `where`, range: range, groupBy: groupBy, sorts: sorts)
     }
 }
 
