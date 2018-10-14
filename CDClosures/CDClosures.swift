@@ -10,13 +10,18 @@
 import Foundation
 import CoreData
 
-protocol CDCCatchEx {
+private func cdcMainThread(code:@escaping ()->Void) {
+    if Thread.current.isMainThread { code() }
+    else { DispatchQueue.main.async { code() } }
+}
+
+private protocol CDCCatchEx {
     func catchBegin()
     func catchEnd()
 }
 
 @discardableResult
-private func cdcDoCatch(msg:String? = nil, lock:NSLock? = nil, ex:CDCCatchEx? = nil, try:() throws -> Void) -> NSError? {
+private func cdcCatchError(msg:String? = nil, lock:NSLock? = nil, ex:CDCCatchEx? = nil, try:() throws -> Void) -> NSError? {
     var error:NSError?
     lock?.lock()
     ex?.catchBegin()
@@ -33,25 +38,37 @@ private func cdcDoCatch(msg:String? = nil, lock:NSLock? = nil, ex:CDCCatchEx? = 
     return error
 }
 
-private func cdcTryCatch(msg:String? = nil, lock:NSLock? = nil, ex:CDCCatchEx? = nil, try:() throws -> Void) throws {
-    if let err = cdcDoCatch(msg: msg, lock: lock, ex: ex, try: `try`) { throw err }
+private func cdcCatchThrows(msg:String? = nil, lock:NSLock? = nil, ex:CDCCatchEx? = nil, try:() throws -> Void) throws {
+    if let err = cdcCatchError(msg: msg, lock: lock, ex: ex, try: `try`) { throw err }
 }
 
 fileprivate extension NSError {
-    convenience init(_ domain:String, _ code:Int) {
-        self.init(domain: domain, code: code, userInfo: nil)
+    class func unregister() -> NSError {
+        return NSError(domain: "unregister CDClosures, please call \"registerCDClosures(fileName)\" at first.", code: 400, userInfo: nil)
+    }
+    class func unfindEntity(entity:String)  -> NSError {
+        return NSError(domain: "unfind entity: \"\(entity)\".", code: 401, userInfo: nil)
+    }
+    class func unfindMomd(momd:String) -> NSError {
+        return NSError(domain: "unfind momd: \"\(momd)\".", code: 402, userInfo: nil)
+    }
+    class func canNotInitManaged(momd:String) -> NSError {
+        return NSError(domain: "can't init NSManagedObjectModel whith momd: \"\(momd)\".", code: 403, userInfo: nil)
+    }
+    class func canNotSaveSqlite(momd:String) -> NSError {
+        return NSError(domain: "can't save sqlite to document directory whith momd: \"\(momd)\".", code: 404, userInfo: nil)
     }
 }
 
 fileprivate extension NSPersistentStoreCoordinator {
     convenience init(name:String) throws {
         guard let url = Bundle.main.url(forResource: name, withExtension: "momd")
-            else { throw NSError("unfind momd: \"\(name)\"", 401) }
+            else { throw NSError.unfindMomd(momd: name) }
         guard let model = NSManagedObjectModel(contentsOf: url)
-            else { throw NSError("can't init NSManagedObjectModel whith momd: \"\(name)\"", 402) }
+            else { throw NSError.canNotInitManaged(momd: name) }
         
         guard let sqlpath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first
-            else { throw NSError("can't save sqlite to document directory", 403) }
+            else { throw NSError.canNotSaveSqlite(momd: name) }
         var sqliteURL = URL(fileURLWithPath: sqlpath)
         sqliteURL.appendPathComponent("\(name).sqlite")
         
@@ -65,7 +82,7 @@ fileprivate extension NSPersistentStoreCoordinator {
 
 fileprivate extension NSManagedObjectContext
 {
-    class func `init`(name:String) throws -> NSManagedObjectContext {
+    class func create(name:String) throws -> NSManagedObjectContext {
         if #available(iOS 10.0, *) {
             return try managedObjectContext_10(name)
         } else {
@@ -90,7 +107,7 @@ fileprivate extension NSManagedObjectContext
 
         let context:NSManagedObjectContext? = container.newBackgroundContext()
         guard let ctx = context
-            else { throw NSError("unfind momd: \"\(name)\"", 401) }
+            else { throw NSError.unfindMomd(momd: name) }
         return ctx
     }
     
@@ -109,12 +126,8 @@ fileprivate extension NSManagedObjectContext
 class CDCMap<Key, Value> where Key : Hashable {
     fileprivate lazy var dict = [Key:Value]()
     public subscript(key: Key) -> Value? {
-        get{
-            return dict[key]
-        }
-        set {
-            dict[key] = newValue
-        }
+        get { return dict[key] }
+        set { dict[key] = newValue }
     }
 }
 
@@ -130,12 +143,8 @@ private class CDCSaver: NSObject, CDCCatchEx {
     }
     
     func cancelPreviousPerform() {
-        if Thread.current.isMainThread {
+        cdcMainThread {
             NSObject.cancelPreviousPerformRequests(withTarget: self)
-        } else {
-            DispatchQueue.main.async {
-                self.cancelPreviousPerform()
-            }
         }
     }
     
@@ -149,12 +158,8 @@ private class CDCSaver: NSObject, CDCCatchEx {
     }
     
     private func performDelay() {
-        if Thread.current.isMainThread {
-            perform(#selector(self.onTime), with: nil, afterDelay: self.time, inModes: [.commonModes,.defaultRunLoopMode])
-        } else {
-            DispatchQueue.main.async {
-                self.performDelay()
-            }
+        cdcMainThread {
+            self.perform(#selector(self.onTime), with: nil, afterDelay: self.time, inModes: [.commonModes,.defaultRunLoopMode])
         }
     }
     
@@ -168,6 +173,10 @@ private class CDCSaver: NSObject, CDCCatchEx {
     func catchEnd() { performDelay() }
 }
 
+func registerCDClosures(_ name:String) throws {
+    try CDClosures.default(name: name)
+}
+
 
 enum CDCSortOp {
     case desc
@@ -178,9 +187,17 @@ typealias CDCRange = (loc:UInt, len:UInt)
 
 fileprivate class CDClosures
 {
-    fileprivate static var modelMap:[String:String] = [:]//className:fileName
-    private static var initlock = NSLock()
+    private static let initlock = NSLock()
+    private static var modelMap:[String:String] = [:]//className:fileName
     private static var map:[String:CDClosures] = [:]//fileName:CDClosures
+    
+    @discardableResult
+    fileprivate class func `default`<T:NSManagedObject>(managedClass :T.Type) throws -> CDClosures {
+        guard let name = CDClosures.modelMap["\(T.self)"] else {
+            throw NSError.unregister()
+        }
+        return try self.default(name: name)
+    }
     
     @discardableResult
     fileprivate class func `default`(name:String) throws -> CDClosures {
@@ -188,8 +205,8 @@ fileprivate class CDClosures
         var err:NSError?
         var cdc:CDClosures? = map[name]
         if cdc == nil {
-           err = cdcDoCatch {
-                let context = try NSManagedObjectContext.init(name:name)
+           err = cdcCatchError {
+                let context = try NSManagedObjectContext.create(name:name)
                 cdc = CDClosures(name, context)
                 map[name] = cdc
             }
@@ -199,14 +216,14 @@ fileprivate class CDClosures
         return cdc!
     }
     
-    private var name:String
+    private let name:String
     private let lock = NSLock()
-    private var context:NSManagedObjectContext
-    private var entityMap:[String:String]
+    private let context:NSManagedObjectContext
+    private let entityMap:[String:String]
     private lazy var saver = CDCSaver() {[weak self] (delay) in
         guard let `self` = self else { return }
         let lock = delay ? `self`.lock : nil
-        if let err = (cdcDoCatch(msg: "save error", lock: lock) {
+        if let err = (cdcCatchError(msg: "save error", lock: lock) {
             try `self`.context.save()
         }) { debugPrint(err) }
     }
@@ -227,7 +244,7 @@ fileprivate class CDClosures
     }
     
     @objc private func applicationDidEnterBackground() {
-        cdcDoCatch(lock: lock) {
+        cdcCatchError(lock: lock) {
             self.saver.perform(delay: false)
         }
     }
@@ -269,7 +286,7 @@ fileprivate class CDClosures
     
     
     fileprivate func select<T:NSManagedObject>(_:T.Type, where:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil, cb:([T])->Void)throws {
-        try cdcTryCatch(msg: "select error", lock: lock) {
+        try cdcCatchThrows(msg: "select error", lock: lock) {
             let context = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
             context.parent = self.context
             let request = fetchRequest(T.self, where: `where`, range: range, groupBy: groupBy, sorts: sorts)
@@ -280,7 +297,7 @@ fileprivate class CDClosures
     
     fileprivate func update<T:NSManagedObject>(_:T.Type, where:String? = nil, cb:(T)->Void) throws -> Int {
         var count = 0
-        try cdcTryCatch(msg: "update error", lock: lock, ex: saver) {
+        try cdcCatchThrows(msg: "update error", lock: lock, ex: saver) {
             let ts = try select(T.self, where: `where`)
             for t in ts {
                 cb(t)
@@ -291,10 +308,10 @@ fileprivate class CDClosures
     }
     
     fileprivate func insert<T:NSManagedObject>(_:T.Type, count:Int, cb:(Int, T)->Void) throws {
-        try cdcTryCatch(msg: "insert error", lock: lock, ex: saver) {
+        try cdcCatchThrows(msg: "insert error", lock: lock, ex: saver) {
             let emptyName = entityName(T.self)
             guard let endesc = NSEntityDescription.entity(forEntityName: emptyName, in: context)
-                else { throw NSError("unfind entity: \"\(emptyName)\".", 99) }
+                else { throw NSError.unfindEntity(entity: emptyName) }
             for i in 0..<count {
                 let t = T(entity: endesc, insertInto: context)
                 cb(i,t)
@@ -311,7 +328,7 @@ fileprivate class CDClosures
 
     fileprivate func delete<T:NSManagedObject>(_:T.Type, where:String? = nil) throws -> Int {
         var count = 0
-        try cdcTryCatch(msg: "delete error", lock: lock, ex: saver) {
+        try cdcCatchThrows(msg: "delete error", lock: lock, ex: saver) {
             let ts = try select(T.self, where: `where`)
             for t in ts {
                 context.delete(t)
@@ -321,8 +338,7 @@ fileprivate class CDClosures
         return count
     }
     
-    
-    
+
     fileprivate func frc<T:NSManagedObject>(_:T.Type, delegate:NSFetchedResultsControllerDelegate, sectionNameKeyPath:String? = nil, where:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil) -> NSFetchedResultsController<T> {
         let request = fetchRequest(T.self, where: `where`, range: range, sorts: sorts)
         let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
@@ -332,11 +348,10 @@ fileprivate class CDClosures
         return fetchResultsController
     }
     
-    
     @available(iOS 9.0, *)
     fileprivate func batchDelete<T:NSManagedObject>(_:T.Type, where:String? = nil) throws -> Int {
         var count = 0
-        try cdcTryCatch(msg: "batchUpdate error", lock: lock) {
+        try cdcCatchThrows(msg: "batchUpdate error", lock: lock) {
             saver.perform(delay: false)
             let request = fetchRequest(T.self, where: `where`)
             let batchDelete = NSBatchDeleteRequest(fetchRequest: request as! NSFetchRequest<NSFetchRequestResult>)
@@ -350,7 +365,7 @@ fileprivate class CDClosures
     
     fileprivate func batchUpdate<T:NSManagedObject>(_:T.Type, where:String? = nil, cb:(CDCMap<String, Any>)->Void) throws -> Int {
         var count = 0
-        try cdcTryCatch(msg: "batchDelete error", lock: lock) {
+        try cdcCatchThrows(msg: "batchDelete error", lock: lock) {
             saver.perform(delay: false)
             let batchUpdate = NSBatchUpdateRequest(entityName: entityName(T.self))
             if let `where` = `where` {
@@ -368,19 +383,14 @@ fileprivate class CDClosures
     }
 }
 
-func registerCDClosures(_ name:String) throws {
-    try CDClosures.default(name: name)
-}
 
-protocol CDClosuresProtocol {}
+protocol CDClosuresProtocol where Self : NSManagedObject {}
+extension NSManagedObject:CDClosuresProtocol {}
 
-extension CDClosuresProtocol where Self : NSManagedObject
+extension CDClosuresProtocol
 {
     private static func cdClosures() throws -> CDClosures {
-        guard let name = CDClosures.modelMap["\(self)"] else {
-            throw NSError("unregister CDClosures, please call \"registerCDClosures(fileName)\" at first", 400)
-        }
-        return try CDClosures.default(name: name)
+        return try CDClosures.default(managedClass: self)
     }
     
     static func select(where:String? = nil, range:CDCRange? = nil, groupBy:[String]? = nil, sorts:[CDCSort]? = nil, cb:([Self])->Void)throws {
@@ -407,7 +417,7 @@ extension CDClosuresProtocol where Self : NSManagedObject
 }
 
 /// 批处理操作，执行前会先将content进行持久化，批处理存在一定延迟
-extension CDClosuresProtocol where Self : NSManagedObject {
+extension CDClosuresProtocol {
     
     @discardableResult
     @available(iOS 9.0, *)
@@ -425,4 +435,3 @@ extension CDClosuresProtocol where Self : NSManagedObject {
     }
 }
 
-extension NSManagedObject:CDClosuresProtocol { }
