@@ -1,0 +1,11 @@
+use_frameworks!
+
+target 'CDClosures_Example' do
+  pod 'CDClosures', :path => '../'
+
+  target 'CDClosures_Tests' do
+    inherit! :search_paths
+
+    
+  end
+end

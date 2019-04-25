@@ -1,0 +1,16 @@
+PODS:
+  - CDClosures (0.1.0)
+
+DEPENDENCIES:
+  - CDClosures (from `../`)
+
+EXTERNAL SOURCES:
+  CDClosures:
+    :path: "../"
+
+SPEC CHECKSUMS:
+  CDClosures: a00687ac43610a092ae02b05030ffc7845ffd02e
+
+PODFILE CHECKSUM: 3242163f560a73e9fb8392281efed31fa973d6ac
+
+COCOAPODS: 1.7.0.beta.3
