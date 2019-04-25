@@ -1,8 +1,8 @@
 {
   "name": "CDClosures",
   "version": "0.1.0",
-  "summary": "A short description of CDClosures.",
-  "description": "TODO: Add long description of the pod here.",
+  "summary": "CoreData Closures.",
+  "description": "CoreData Closures 在原生API基础上进行封装，简化CoreData的使用。",
   "homepage": "https://github.com/youlianchun/CDClosures",
   "license": {
     "type": "MIT",
@@ -18,5 +18,6 @@
   "platforms": {
     "ios": "8.0"
   },
+  "swift_versions": "5.0",
   "source_files": "CDClosures/Classes/**/*"
 }

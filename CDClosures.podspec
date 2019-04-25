@@ -18,7 +18,7 @@ Pod::Spec.new do |s|
 #   * Finally, don't worry about the indent, CocoaPods strips it!
 
   s.description      = <<-DESC
-CoreData Closures 在原生API基础上进行封装。简化CoreData的使用。
+CoreData Closures 在原生API基础上进行封装，简化CoreData的使用。
                        DESC
 
   s.homepage         = 'https://github.com/youlianchun/CDClosures'
@@ -29,7 +29,8 @@ CoreData Closures 在原生API基础上进行封装。简化CoreData的使用。
   # s.social_media_url = 'https://twitter.com/<TWITTER_USERNAME>'
 
   s.ios.deployment_target = '8.0'
-
+  s.swift_version = '4.0'
+  
   s.source_files = 'CDClosures/Classes/**/*'
   
   # s.resource_bundles = {
