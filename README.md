@@ -21,6 +21,87 @@ CDClosures 是一个专为 iOS 开发者设计的 CoreData 操作封装库，通
 - **API 兼容** - 兼容 CoreData 不同版本的 API
 - **友好接入** - 相比 CoreData 原生 API 更加易用
 
+## 核心技术原理框架
+
+```mermaid
+graph TB
+    subgraph "应用层"
+        A[开发者代码] --> B[CDClosures API]
+    end
+    
+    subgraph "CDClosures 核心层"
+        B --> C[注册管理器]
+        B --> D[闭包处理器]
+        B --> E[线程安全控制器]
+        B --> F[异常处理器]
+    end
+    
+    subgraph "数据映射层"
+        C --> G[Entity-Class 映射]
+        G --> H[自动注册机制]
+    end
+    
+    subgraph "操作执行层"
+        D --> I[CRUD 操作封装]
+        I --> J[批量操作优化]
+        I --> K[关联关系处理]
+    end
+    
+    subgraph "持久化层"
+        J --> L[数据持久化]
+        K --> L
+        L --> M[异步提交队列]
+    end
+    
+    subgraph "CoreData 底层"
+        M --> N[CoreData Stack]
+        N --> O[SQLite 数据库]
+    end
+    
+    subgraph "监控与优化"
+        E --> P[线程锁管理]
+        F --> Q[异常捕获与处理]
+        M --> R[性能监控]
+        R --> S[自动优化策略]
+    end
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#fce4ec
+    style F fill:#f1f8e9
+    style G fill:#e0f2f1
+    style H fill:#e8eaf6
+    style I fill:#fff8e1
+    style J fill:#f3e5f5
+    style K fill:#e1f5fe
+    style L fill:#e8f5e8
+    style M fill:#fff3e0
+    style N fill:#fce4ec
+    style O fill:#f1f8e9
+    style P fill:#e0f2f1
+    style Q fill:#e8eaf6
+    style R fill:#fff8e1
+    style S fill:#f3e5f5
+```
+
+### 架构说明
+
+**🔹 应用层**：开发者通过简洁的闭包语法调用 CDClosures API
+
+**🔹 核心层**：包含注册管理、闭包处理、线程控制、异常处理等核心功能模块
+
+**🔹 映射层**：自动建立 CoreData Entity 与 Swift Class 的映射关系
+
+**🔹 执行层**：封装 CRUD 操作，支持批量处理和关联关系处理
+
+**🔹 持久化层**：数据持久化与异步提交队列管理
+
+**🔹 底层**：基于 CoreData Stack 和 SQLite 数据库
+
+**🔹 监控层**：线程安全、异常处理、性能监控和自动优化
+
 ## 工作原理
 
 ### 架构设计
